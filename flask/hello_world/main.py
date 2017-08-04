@@ -36,15 +36,17 @@ import logging
 def hello():
 
 	signedIn = False
-	isAdmin = True
 	#check if signed in
 	if 'sign_in_name' in session.keys():
 		if 'token' in session.keys():
 			query = PlayerModel.query(PlayerModel.name == session['sign_in_name'],PlayerModel.token == session['token']).get()
 			if query is None:
+				logging.debug("pm not found")
 				signedIn = False;
 			else:
+				session['admin'] = query.admin
 				signedIn = True;
+				logging.debug("pm found")
 		
 	qgamelist = GamesModel.query()
 	gamelist = list()
@@ -98,10 +100,13 @@ def AccessToken():
 		pmQuery = PlayerModel.query(PlayerModel.name == user,PlayerModel.pw == pw)
 		pm = pmQuery.get()
 		if pm is None:
+			logging.debug("Wrong password or username")
 			return "Wrong password or username"
 		else:
+			logging.debug("logged in")
 			#set store token into session
 			session['signed_in'] = True
+			session['sign_in_name'] = user
 			session['token'] = pm.token
 			#return as json
 			data = {'token': session['token']}
@@ -225,7 +230,12 @@ def IfLetterExist(character, id):
 
 @app.route('/admin' ,methods = ['GET'])
 def adminStats():
-	return render_template("admin.html")
+	if 'admin' not in session.keys():
+		return redirect("/", code=302)
+	if session['admin'] == False:
+		return redirect("/", code=302)
+	else:
+		return render_template("admin.html")
 
 
 @app.route('/admin/players',methods = ['GET'])
