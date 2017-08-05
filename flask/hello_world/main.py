@@ -22,7 +22,6 @@ from flask import render_template
 from flask import jsonify
 from flask import session
 from flask import Response
-from flask import url_for
 app = Flask(__name__)
 import os, binascii
 app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT'
@@ -34,9 +33,6 @@ import base64
 import re
 import logging
 
-def ErrorResponse(type, id, msg):
-	return Response(type, id, msg)
-	
 
 @app.route('/')
 def hello():
@@ -85,7 +81,7 @@ def AccessToken():
 		pmQuery = PlayerModel.query(PlayerModel.name == user)
 		pm = pmQuery.get()
 		if pm is not None:
-			return ErrorResponse('User Already Existing', 409, { 'error' : 'Conflicting user id' } )		
+			return Response('User Already Existing', 409, { 'error' : 'Conflicting user id' } )		
 		token = createToken()
 		#create the playermodel
 		pmodel = PlayerModel()
@@ -109,7 +105,8 @@ def AccessToken():
 		pmQuery = PlayerModel.query(PlayerModel.name == user,PlayerModel.pw == pw)
 		pm = pmQuery.get()
 		if pm is None:
-			return ErrorResponse('User not found', 404, { 'error' : 'User not found' })
+			#return render_template('404.html'), 404
+			return Response('User not found', 404, { 'error' : 'User not found' })
 		else:
 			logging.debug("logged in")
 			#set store token into session
@@ -120,7 +117,7 @@ def AccessToken():
 			data = {'token': session['token']}
 			return json.dumps(data)
 	else:
-		return ErrorResponse('Method not allowed', 405, {'error': 'Method not allowed'})
+		return Response('Method not allowed', 405, {'error': 'Method not allowed'})
 		
 @app.route('/games' ,methods = ['GET','POST','DELETE'])
 def games():
@@ -196,7 +193,7 @@ def checkLetter(id):
 def IfLetterExist(character, id):
 	if not character.isalpha() :
 		if len(character) is not 1:
-			return ErrorResponse("error", 400, { "error" :  "Bad request, malformed data" } )
+			return Response("error", 400, { "error" :  "Bad request, malformed data" } )
 	
 	
 	q = GamesProgress.query(GamesProgress.roomID == id,GamesProgress.username == session['sign_in_name']).get()
@@ -248,9 +245,9 @@ def IfLetterExist(character, id):
 @app.route('/admin' ,methods = ['GET'])
 def adminStats():
 	if 'admin' not in session.keys():
-		return ErrorResponse('error : You do not have permission to perorm this operation', 403, {'error':'You do not have permission to perorm this operation'})
+		return Response('error : You do not have permission to perorm this operation', 403, {'error':'You do not have permission to perorm this operation'})
 	if session['admin'] == False:
-		return ErrorResponse('error : You do not have permission to perorm this operation', 403, {'error':'You do not have permission to perorm this operation'})
+		return Response('error : You do not have permission to perorm this operation', 403, {'error':'You do not have permission to perorm this operation'})
 	else:
 		return render_template("admin.html")
 
@@ -317,28 +314,28 @@ def server_error500(e):
     # Log the error and stacktrace.
     logging.exception('Error 500: Server Crash, An error occurred during a request.')
     #return redirect('/', code = 302)
-    #return 'An internal error occurred.', 500
+    return 'An internal error occurred.', 500
 
 @app.errorhandler(400)
 def server_error400(e):
     # Log the error and stacktrace.
     logging.exception('Error 400 : Bad Request,An error occurred during a request.')
     #return redirect('/', code = 302)
-    #return 'An internal error occurred.', 400
+    return 'An internal error occurred.', 400
 
 @app.errorhandler(403)
 def server_error403(e):
     # Log the error and stacktrace.
     logging.exception('Error 403 : Forbidden,An error occurred during a request.')
     #return redirect('/', code = 302)
-    #return 'An internal error occurred.', 403
+    return 'An internal error occurred.', 403
 
 @app.errorhandler(404)
 def server_error404(e):
     # Log the error and stacktrace.
     logging.exception('Error 404 Not Found,An error occurred during a request.')
     #return redirect('/', code = 302)
-    #return 'An internal error occurred.', 404
+    return 'user not found', 404
 
 @app.errorhandler(405)
 def server_error405(e):
