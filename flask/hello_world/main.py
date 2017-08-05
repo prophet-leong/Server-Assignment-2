@@ -21,6 +21,8 @@ from flask import redirect
 from flask import render_template
 from flask import jsonify
 from flask import session
+from flask import Response
+from flask import url_for
 app = Flask(__name__)
 import os, binascii
 app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT'
@@ -31,6 +33,10 @@ import json
 import base64
 import re
 import logging
+
+def ErrorResponse(type, id, msg):
+	return Response(type, id, msg)
+	
 
 @app.route('/')
 def hello():
@@ -69,7 +75,6 @@ def createToken():
 	session['token'] = str(token)
 	return str(token)
 
-	
 @app.route('/token', methods=['POST','GET'])
 def AccessToken():
 	
@@ -77,6 +82,10 @@ def AccessToken():
 		#getting data from headers
 		session['sign_in_name'] = request.authorization.username
 		password = request.authorization.password
+		pmQuery = PlayerModel.query(PlayerModel.name == user)
+		pm = pmQuery.get()
+		if pm is not None:
+			return ErrorResponse('User Already Existing', 409, { 'error' : 'Conflicting user id' } )		
 		token = createToken()
 		#create the playermodel
 		pmodel = PlayerModel()
@@ -92,7 +101,7 @@ def AccessToken():
 		data = {'token': session['token']}
 		session['signed_in'] = True
 		return json.dumps(data)
-	else:
+	elif request.method == 'GET':
 		#getting data from headers
 		user = request.authorization.username
 		pw = request.authorization.password
@@ -100,8 +109,7 @@ def AccessToken():
 		pmQuery = PlayerModel.query(PlayerModel.name == user,PlayerModel.pw == pw)
 		pm = pmQuery.get()
 		if pm is None:
-			logging.debug("Wrong password or username")
-			return "Wrong password or username"
+			return ErrorResponse('User not found', 404, { 'error' : 'User not found' })
 		else:
 			logging.debug("logged in")
 			#set store token into session
@@ -111,6 +119,8 @@ def AccessToken():
 			#return as json
 			data = {'token': session['token']}
 			return json.dumps(data)
+	else:
+		return ErrorResponse('Method not allowed', 405, {'error': 'Method not allowed'})
 		
 @app.route('/games' ,methods = ['GET','POST','DELETE'])
 def games():
@@ -136,10 +146,13 @@ def games():
 		gamedata.update({'game_id':str(id)})
 		return json.dumps(gamedata)
 	elif request.method =='DELETE':
-		GamesModel.deleteAll()
-		return ""
+		if session['admin'] == True:
+			GamesModel.deleteAll()
+			return ""
+		else:
+			return redirect("/",code = 302)
 @app.route('/games/<int:id>' ,methods = ['GET','DELETE'])
-def goGame(id):
+def GoGame(id):
 	intid = int(id)
 	d = GamesModel.get_by_id(intid)
 	if d is not None:
@@ -181,7 +194,11 @@ def checkLetter(id):
 	else:
 		return IfLetterExist(guess,id)
 def IfLetterExist(character, id):
-	#messy clusterfuck
+	if not character.isalpha() :
+		if len(character) is not 1:
+			return ErrorResponse("error", 400, { "error" :  "Bad request, malformed data" } )
+	
+	
 	q = GamesProgress.query(GamesProgress.roomID == id,GamesProgress.username == session['sign_in_name']).get()
 	game = GamesModel.get_by_id(id)
 	count = 0
@@ -231,9 +248,9 @@ def IfLetterExist(character, id):
 @app.route('/admin' ,methods = ['GET'])
 def adminStats():
 	if 'admin' not in session.keys():
-		return redirect("/", code=302)
+		return ErrorResponse('error : You do not have permission to perorm this operation', 403, {'error':'You do not have permission to perorm this operation'})
 	if session['admin'] == False:
-		return redirect("/", code=302)
+		return ErrorResponse('error : You do not have permission to perorm this operation', 403, {'error':'You do not have permission to perorm this operation'})
 	else:
 		return render_template("admin.html")
 
@@ -296,8 +313,37 @@ def adminWords():
 	return json.dumps(jsonList)
 
 @app.errorhandler(500)
-def server_error(e):
+def server_error500(e):
     # Log the error and stacktrace.
-	logging.exception('An error occurred during a request.')
-	return 'An internal error occurred.', 500
+    logging.exception('Error 500: Server Crash, An error occurred during a request.')
+    #return redirect('/', code = 302)
+    #return 'An internal error occurred.', 500
+
+@app.errorhandler(400)
+def server_error400(e):
+    # Log the error and stacktrace.
+    logging.exception('Error 400 : Bad Request,An error occurred during a request.')
+    #return redirect('/', code = 302)
+    #return 'An internal error occurred.', 400
+
+@app.errorhandler(403)
+def server_error403(e):
+    # Log the error and stacktrace.
+    logging.exception('Error 403 : Forbidden,An error occurred during a request.')
+    #return redirect('/', code = 302)
+    #return 'An internal error occurred.', 403
+
+@app.errorhandler(404)
+def server_error404(e):
+    # Log the error and stacktrace.
+    logging.exception('Error 404 Not Found,An error occurred during a request.')
+    #return redirect('/', code = 302)
+    #return 'An internal error occurred.', 404
+
+@app.errorhandler(405)
+def server_error405(e):
+    # Log the error and stacktrace.
+    logging.exception('Error 405 Method Not Allow, An error occurred during a request.')
+    #return redirect('/', code = 302)
+    return 'An internal error occurred.', 405
 # [END app]
