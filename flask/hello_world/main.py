@@ -78,7 +78,7 @@ def AccessToken():
 		#getting data from headers
 		session['sign_in_name'] = request.authorization.username
 		password = request.authorization.password
-		pmQuery = PlayerModel.query(PlayerModel.name == user)
+		pmQuery = PlayerModel.query(PlayerModel.name == session['sign_in_name'])
 		pm = pmQuery.get()
 		if pm is not None:
 			return Response('User Already Existing', 409, { 'error' : 'Conflicting user id' } )		
@@ -160,7 +160,10 @@ def GoGame(id):
 			return render_template('game.html',game_property = game)
 		elif request.method == 'DELETE':
 			#delete one game
-			d.delete()
+			if session['admin'] == True:
+				d.delete()
+			else:
+				return Response('error : You do not have permission to perorm this operation', 403, {'error':'You do not have permission to perorm this operation'})
 	return ""
 	
 @app.route('/games/check_letter/<int:id>' ,methods = ['POST'])
